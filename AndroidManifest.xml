@@ -1,0 +1,17 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.READ_LOGS" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
+    <uses-permission android:name="android.permission.INTERACT_ACROSS_USERS_FULL" />
+	<uses-permission android:name="android.permission.DUMP"/>
+	<uses-permission android:name="android.permission.SET_KEYBOARD_LAYOUT" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <application android:label="Keyboard Layout Manager" android:allowBackup="false" android:sharedUserId="android.uid.system" android:persistent="true">
+        <service
+            android:name=".HarpocratKBSyncService"
+			android:enabled="true"
+            android:exported="false" />
+    </application>
+</manifest>
