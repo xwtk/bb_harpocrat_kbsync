@@ -3,10 +3,16 @@ package hardware.xwtk.harpocrat.kbsync
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
-import android.provider.Settings
+import android.os.Handler
+import android.os.HandlerThread
+import android.os.Looper
 import android.util.Log
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import android.view.inputmethod.InputMethodManager
+import android.provider.Settings
+
+private val handlerThread = HandlerThread("LocaleMonitorThread").apply { start() }
+private val handler = Handler(handlerThread.looper)
+private var lastLocale: String? = null
 
 class HarpocratKBSyncService : Service() {
     private val TAG = "HarpocratKBS"
@@ -143,7 +149,7 @@ class HarpocratKBSyncService : Service() {
     override fun onCreate() {
         super.onCreate()
         running = true
-        startLogcatMonitor()
+        startLocaleMonitor()
     }
 
     override fun onDestroy() {
@@ -158,28 +164,27 @@ class HarpocratKBSyncService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private fun startLogcatMonitor() {
-        logcatThread = Thread {
-            try {
-                val proc = Runtime.getRuntime().exec(arrayOf("logcat", "-v", "brief", "LPM:I", "*:S"))
-                val reader = BufferedReader(InputStreamReader(proc.inputStream))
-                while (running) {
-                    val line = reader.readLine() ?: break
-                    if ("Changing locale to" in line) {
-                        if (!isBBKeyboardActive()) {
-                            continue
-                        }
-                        val lang = line.substringAfter("Changing locale to").trim().split(" ")[0]
-                        Log.i(TAG, "Synchronizing hardware keyboard layout to $lang")
-                        applyBestLayoutFor(lang)
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Logcat monitor failed", e)
-            }
-        }.also { it.start() }
-    }
+    private fun startLocaleMonitor() {
+        handler.post(object : Runnable {
+            override fun run() {
+                try {
+                    val imm = getSystemService(INPUT_METHOD_SERVICE) as? InputMethodManager
+                    val subtype = imm?.currentInputMethodSubtype
+                    val locale = subtype?.locale
     
+                    if (locale != null && locale != lastLocale && isBBKeyboardActive()) {
+                        lastLocale = locale
+                        Log.i(TAG, "Detected locale change to $locale")
+                        applyBestLayoutFor(locale)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to check IME locale", e)
+                }
+    
+                if (running) handler.postDelayed(this, 250)
+            }
+        })
+    }
 
     private fun isBBKeyboardActive(): Boolean {
         val ime = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
